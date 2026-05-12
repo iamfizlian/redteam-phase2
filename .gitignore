@@ -1,0 +1,17 @@
+.env
+.venv/
+__pycache__/
+*.pyc
+
+# Test output and sensitive artifacts
+loot/
+captures/
+reports/*.docx
+reports/*.pdf
+*.token
+*.secret
+captured_*.json
+prt-*.json
+
+# Generated deployment output
+generated/

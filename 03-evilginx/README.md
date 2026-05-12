@@ -9,8 +9,9 @@ A reverse proxy sitting between the victim and `login.microsoftonline.com` captu
 Run `deploy.sh` on a fresh Debian/Ubuntu cloud VM. The script installs Evilginx upstream from the public repo, firewalls the box, and gives you next-step instructions.
 
 ```bash
-curl -O https://raw.githubusercontent.com/.../deploy.sh   # or scp this file
-sudo bash deploy.sh
+scp 03-evilginx/deploy.sh root@<vm-ip>:/root/deploy.sh
+ssh root@<vm-ip>
+bash /root/deploy.sh
 ```
 
 ## Test execution outline
