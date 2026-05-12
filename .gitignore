@@ -15,3 +15,6 @@ prt-*.json
 
 # Generated deployment output
 generated/
+
+# Evilginx container runtime data
+03-evilginx/docker/runtime/

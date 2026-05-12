@@ -14,6 +14,11 @@ ssh root@<vm-ip>
 bash /root/deploy.sh
 ```
 
+For a reproducible Docker-based VM deployment, use branch `deploy/evilginx-container` and see:
+
+- `03-evilginx/RUNBOOK.md`
+- `03-evilginx/docker/README.md`
+
 ## Test execution outline
 
 After deployment:

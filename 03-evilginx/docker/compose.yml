@@ -1,0 +1,19 @@
+services:
+  evilginx:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: evilginx-lab
+    network_mode: host
+    stdin_open: true
+    tty: true
+    restart: unless-stopped
+    env_file:
+      - ../../.env
+    volumes:
+      - ./runtime:/data
+      - ./runtime/phishlets:/data/phishlets:ro
+      - ./runtime/logs:/data/logs
+      - ./runtime/config:/data/config
+    security_opt:
+      - no-new-privileges:true

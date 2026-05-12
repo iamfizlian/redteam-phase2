@@ -56,6 +56,14 @@ Each folder contains the operator checklist for that vector. Keep all execution 
 
 `03-evilginx/deploy.sh` installs upstream Evilginx on a fresh Debian or Ubuntu VM and configures the firewall. It does not ship a working Microsoft 365 phishlet.
 
+For containerized VM deployment, use the separate branch:
+
+```bash
+git checkout deploy/evilginx-container
+```
+
+Then follow `03-evilginx/RUNBOOK.md`.
+
 Expected VM flow:
 
 ```bash
