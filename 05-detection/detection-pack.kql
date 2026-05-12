@@ -1,0 +1,287 @@
+// ============================================================================
+// M365 Token Theft Detection Pack
+// For Microsoft Sentinel and Defender XDR Advanced Hunting
+//
+// Each section maps to a vector from the methodology. Tune thresholds and
+// allowlists to your tenant before deploying as analytic rules.
+// ============================================================================
+
+
+// ============================================================================
+// SECTION 1 — OAuth ILLICIT CONSENT GRANT
+// ============================================================================
+
+// 1.1 — All consent grants in the last 7 days
+// Use as a baseline view; tune to alert on non-allowlisted apps.
+AuditLogs
+| where TimeGenerated > ago(7d)
+| where OperationName == "Consent to application"
+| extend AppDisplayName = tostring(TargetResources[0].displayName)
+| extend AppId = tostring(TargetResources[0].id)
+| extend ConsentedBy = tostring(InitiatedBy.user.userPrincipalName)
+| extend ConsentType = tostring(parse_json(tostring(TargetResources[0].modifiedProperties))[0].newValue)
+| extend Scopes = tostring(parse_json(tostring(TargetResources[0].modifiedProperties))[4].newValue)
+| project TimeGenerated, ConsentedBy, AppDisplayName, AppId, ConsentType, Scopes, Result
+| order by TimeGenerated desc
+
+
+// 1.2 — Consent to apps requesting high-impact Graph scopes
+// Common AitM/BEC scopes: Mail.Read, Mail.ReadWrite, Files.Read.All, Sites.Read.All, full_access_as_user
+let SuspiciousScopes = dynamic([
+    "Mail.Read", "Mail.ReadWrite", "Mail.Send",
+    "Files.Read.All", "Files.ReadWrite.All",
+    "Sites.Read.All", "Sites.ReadWrite.All",
+    "User.Read.All", "Directory.Read.All",
+    "full_access_as_user"
+]);
+AuditLogs
+| where OperationName == "Consent to application"
+| extend Scopes = tostring(parse_json(tostring(TargetResources[0].modifiedProperties))[4].newValue)
+| where Scopes has_any (SuspiciousScopes)
+| extend AppDisplayName = tostring(TargetResources[0].displayName)
+| extend ConsentedBy = tostring(InitiatedBy.user.userPrincipalName)
+| project TimeGenerated, ConsentedBy, AppDisplayName, Scopes
+
+
+// 1.3 — App registrations by non-admin users (rare → suspicious)
+// Adjust the AdminUPNs allowlist to your real admins.
+let AdminUPNs = dynamic(["admin1@contoso.com", "admin2@contoso.com"]);
+AuditLogs
+| where OperationName in ("Add application", "Add service principal")
+| extend InitiatorUPN = tostring(InitiatedBy.user.userPrincipalName)
+| where isnotempty(InitiatorUPN)
+| where InitiatorUPN !in (AdminUPNs)
+| project TimeGenerated, OperationName, InitiatorUPN, TargetResources
+
+
+// 1.4 — OAuth token requests for apps that recently received consent
+// Joins consent grants to subsequent token usage to identify the post-consent activity
+let RecentConsents = 
+    AuditLogs
+    | where TimeGenerated > ago(7d)
+    | where OperationName == "Consent to application"
+    | extend AppId = tostring(TargetResources[0].id)
+    | project ConsentTime=TimeGenerated, ConsentedBy=tostring(InitiatedBy.user.userPrincipalName), AppId;
+SigninLogs
+| where TimeGenerated > ago(7d)
+| where ResultType == 0
+| extend AppId = AppId  // already present
+| join kind=inner RecentConsents on AppId
+| where TimeGenerated > ConsentTime
+| project TimeGenerated, UserPrincipalName, AppDisplayName, AppId, IPAddress, ConsentTime, ConsentedBy
+
+
+
+// ============================================================================
+// SECTION 2 — DEVICE CODE FLOW PHISHING
+// ============================================================================
+
+// 2.1 — All device code authentications (should be rare; baseline first, then alert)
+SigninLogs
+| where TimeGenerated > ago(7d)
+| where AuthenticationProtocol == "deviceCode"
+| project TimeGenerated, UserPrincipalName, IPAddress, AppDisplayName,
+          ResourceDisplayName, Status, ConditionalAccessStatus, LocationDetails
+
+
+// 2.2 — Device code with location mismatch between auth and resource access
+// Strong indicator: user authenticated from their location, but token used from elsewhere
+let DeviceCodeAuths =
+    SigninLogs
+    | where TimeGenerated > ago(7d)
+    | where AuthenticationProtocol == "deviceCode"
+    | where ResultType == 0
+    | project AuthTime=TimeGenerated, UserPrincipalName, AuthIP=IPAddress,
+              AuthCountry=tostring(LocationDetails.countryOrRegion);
+let TokenUse =
+    union SigninLogs, AADNonInteractiveUserSignInLogs
+    | where TimeGenerated > ago(7d)
+    | project UseTime=TimeGenerated, UserPrincipalName, UseIP=IPAddress,
+              UseCountry=tostring(LocationDetails.countryOrRegion), AppDisplayName;
+DeviceCodeAuths
+| join kind=inner TokenUse on UserPrincipalName
+| where UseTime between (AuthTime .. AuthTime + 2h)
+| where AuthIP != UseIP and AuthCountry != UseCountry
+| project AuthTime, UseTime, UserPrincipalName, AuthIP, AuthCountry, UseIP, UseCountry, AppDisplayName
+
+
+// 2.3 — Device code attempts blocked by Conditional Access (validation query)
+// Confirms your Authentication Flows CA policy is firing
+SigninLogs
+| where AuthenticationProtocol == "deviceCode"
+| where ConditionalAccessStatus == "failure"
+| project TimeGenerated, UserPrincipalName, IPAddress, AppDisplayName,
+          ConditionalAccessPolicies, ResultDescription
+
+
+
+// ============================================================================
+// SECTION 3 — AITM PHISHING / SESSION TOKEN REPLAY
+// ============================================================================
+
+// 3.1 — Successful sign-in followed quickly by activity from a different IP
+// Classic AitM cookie replay pattern: legit auth, then attacker uses cookie from elsewhere
+let SuccessSignins =
+    SigninLogs
+    | where TimeGenerated > ago(1d)
+    | where ResultType == 0
+    | where AppDisplayName has_any ("Office 365", "Outlook", "Teams", "SharePoint", "OneDrive")
+    | project SignInTime=TimeGenerated, UserPrincipalName, SignInIP=IPAddress,
+              SignInUA=UserAgent, SignInCountry=tostring(LocationDetails.countryOrRegion);
+SuccessSignins
+| join kind=inner (
+    SuccessSignins
+    | project-rename ReuseTime=SignInTime, ReuseIP=SignInIP, ReuseUA=SignInUA, ReuseCountry=SignInCountry
+) on UserPrincipalName
+| where ReuseTime between (SignInTime + 1m .. SignInTime + 30m)
+| where SignInIP != ReuseIP and SignInCountry != ReuseCountry
+| project SignInTime, ReuseTime, UserPrincipalName, SignInIP, SignInCountry,
+          ReuseIP, ReuseCountry, SignInUA, ReuseUA
+
+
+// 3.2 — Sign-ins where Token Protection enforcement was NOT satisfied
+// Tells you which apps/users are seeing unbound tokens get blocked (or slipping through)
+SigninLogs
+| where TimeGenerated > ago(7d)
+| extend EnforcedControls = tostring(EnforcedSessionControls)
+| extend NotSatisfied = tostring(SessionControlsNotSatisfied)
+| where EnforcedControls has "SignInTokenProtection" or NotSatisfied has "SignInTokenProtection"
+| project TimeGenerated, UserPrincipalName, AppDisplayName, IPAddress,
+          DeviceDetail, EnforcedControls, NotSatisfied, ResultType, Status
+
+
+// 3.3 — Post-AitM behavioral signal: new inbox rules
+// AitM/BEC actors commonly create rules to hide responses or forward mail
+OfficeActivity
+| where TimeGenerated > ago(7d)
+| where Operation in ("New-InboxRule", "Set-InboxRule", "UpdateInboxRules", "Set-Mailbox")
+| where Parameters has_any ("ForwardTo", "RedirectTo", "DeleteMessage", "MoveToFolder")
+| project TimeGenerated, UserId, ClientIP, Operation, Parameters
+
+
+// 3.4 — Anomalous user agent strings (per-user)
+// Stolen session replayed in attacker's browser will have a UA that user has never used
+let KnownUserAgents =
+    SigninLogs
+    | where TimeGenerated between (ago(30d) .. ago(1d))
+    | summarize KnownUAs=make_set(UserAgent) by UserPrincipalName;
+SigninLogs
+| where TimeGenerated > ago(1d)
+| where ResultType == 0
+| join kind=inner KnownUserAgents on UserPrincipalName
+| where UserAgent !in (KnownUAs)
+| where isnotempty(UserAgent)
+| project TimeGenerated, UserPrincipalName, UserAgent, IPAddress, AppDisplayName
+
+
+// 3.5 — Sign-ins from known AitM-favorable ASN / hosting providers
+// Not a hard detection on its own; tune with your own threat intel
+let HostingASNs = dynamic([
+    "DIGITALOCEAN-ASN", "AMAZON-02", "AMAZON-AES", "OVH SAS",
+    "Linode", "VULTR", "Hetzner", "M247", "Choopa"
+]);
+SigninLogs
+| where TimeGenerated > ago(1d)
+| where ResultType == 0
+| extend ASN = tostring(NetworkLocationDetails[0].networkNames)
+| where ASN has_any (HostingASNs)
+| where AppDisplayName has_any ("Office 365", "Outlook", "Teams", "SharePoint")
+| project TimeGenerated, UserPrincipalName, ASN, IPAddress, AppDisplayName, UserAgent
+
+
+
+// ============================================================================
+// SECTION 4 — ENDPOINT TOKEN THEFT
+// ============================================================================
+
+// 4.1 — Non-browser processes touching browser cookie stores or token caches
+// Catches cookie/token extraction by non-legitimate processes
+DeviceFileEvents
+| where TimeGenerated > ago(7d)
+| where FileName == "Cookies"
+   or FolderPath has ".IdentityService"
+   or FolderPath has "TokenBroker"
+   or FolderPath has "OneAuth"
+| where ActionType in ("FileCopied", "FileRead", "FileCreated")
+| where InitiatingProcessFileName !in~ (
+    "msedge.exe", "chrome.exe", "firefox.exe", "iexplore.exe",
+    "outlook.exe", "teams.exe", "onedrive.exe",
+    "MicrosoftEdgeUpdate.exe", "GoogleUpdate.exe",
+    "explorer.exe", "SearchHost.exe"
+  )
+| project Timestamp, DeviceName, AccountName, InitiatingProcessFileName,
+          InitiatingProcessCommandLine, FileName, FolderPath, ActionType
+
+
+// 4.2 — BrowserCore.exe invocations from unusual parents
+// BrowserCore.exe is the PRT cookie retrieval mechanism; legit parents are limited
+DeviceProcessEvents
+| where TimeGenerated > ago(7d)
+| where FileName =~ "BrowserCore.exe"
+| where InitiatingProcessFileName !in~ ("msedge.exe", "chrome.exe", "msedgewebview2.exe")
+| project Timestamp, DeviceName, AccountName,
+          InitiatingProcessFileName, InitiatingProcessCommandLine,
+          ProcessCommandLine
+
+
+// 4.3 — Sign-in with new deviceId for an established user
+// Replayed tokens from another box show up here
+let KnownDevices =
+    SigninLogs
+    | where TimeGenerated between (ago(30d) .. ago(1d))
+    | extend DeviceId = tostring(DeviceDetail.deviceId)
+    | where isnotempty(DeviceId)
+    | summarize KnownDeviceIds=make_set(DeviceId) by UserPrincipalName;
+SigninLogs
+| where TimeGenerated > ago(1d)
+| where ResultType == 0
+| extend CurrentDeviceId = tostring(DeviceDetail.deviceId)
+| where isnotempty(CurrentDeviceId)
+| join kind=inner KnownDevices on UserPrincipalName
+| where CurrentDeviceId !in (KnownDeviceIds)
+| project TimeGenerated, UserPrincipalName, CurrentDeviceId, IPAddress,
+          AppDisplayName, DeviceDetail
+
+
+// 4.4 — PowerShell modules associated with token theft tooling loaded
+DeviceEvents
+| where TimeGenerated > ago(7d)
+| where ActionType == "PowerShellCommand"
+| where AdditionalFields has_any ("AADInternals", "TokenTactics", "ROADtools", "roadtx", "GraphRunner")
+| project Timestamp, DeviceName, AccountName, InitiatingProcessCommandLine, AdditionalFields
+
+
+// 4.5 — Suspicious access to LSASS or BrowserCore from non-system processes
+DeviceEvents
+| where TimeGenerated > ago(7d)
+| where ActionType == "OpenProcessApiCall"
+| extend TargetProcess = tostring(parse_json(AdditionalFields).TargetImageName)
+| where TargetProcess endswith "lsass.exe" or TargetProcess endswith "BrowserCore.exe"
+| where InitiatingProcessFileName !in~ ("MsMpEng.exe", "SenseIR.exe", "MsSense.exe", "csrss.exe")
+| project Timestamp, DeviceName, InitiatingProcessFileName,
+          InitiatingProcessCommandLine, TargetProcess
+
+
+
+// ============================================================================
+// SECTION 5 — REVOCATION VALIDATION
+// ============================================================================
+
+// 5.1 — Verify CAE strict location is dropping tokens as expected
+// After test, run this filtered to your test users
+SigninLogs
+| where TimeGenerated > ago(1d)
+| where UserPrincipalName in ("victim01@yourtenant.onmicrosoft.com")
+| where ResultType != 0
+| where ResultDescription has_any ("continuous access", "CAE", "location", "outside")
+| project TimeGenerated, UserPrincipalName, IPAddress, ResultType,
+          ResultDescription, ConditionalAccessStatus
+
+
+// 5.2 — Refresh token revocation events
+// Confirms that explicit revocation (Revoke-MgUserSignInSession) actually fired
+AuditLogs
+| where TimeGenerated > ago(7d)
+| where OperationName has_any ("Revoke", "Reset")
+| where OperationName has_any ("refresh token", "session", "password")
+| project TimeGenerated, OperationName, InitiatedBy, TargetResources, Result
