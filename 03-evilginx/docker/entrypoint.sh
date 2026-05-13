@@ -30,4 +30,4 @@ if [ -n "${EVILGINX_VM_IP:-}" ]; then
 fi
 
 printf '\nStarting Evilginx console...\n\n'
-exec /opt/evilginx2/bin/evilginx -p /data/phishlets "$@"
+exec /usr/local/bin/evilginx -p /data/phishlets "$@"

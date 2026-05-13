@@ -17,6 +17,8 @@ RUN git clone --depth 1 --branch "${EVILGINX_REF}" "${EVILGINX_REPO}" evilginx2
 
 WORKDIR /src/evilginx2
 RUN make
+RUN test -x /src/evilginx2/build/evilginx \
+    && cp /src/evilginx2/build/evilginx /usr/local/bin/evilginx
 
 FROM debian:12-slim
 
@@ -28,9 +30,11 @@ ENV HOME=/data
 
 WORKDIR /opt/evilginx2
 COPY --from=builder /src/evilginx2 /opt/evilginx2
+COPY --from=builder /usr/local/bin/evilginx /usr/local/bin/evilginx
 COPY entrypoint.sh /entrypoint.sh
 
 RUN chmod +x /entrypoint.sh \
+    && chmod +x /usr/local/bin/evilginx \
     && mkdir -p /data/phishlets /data/logs /data/config
 
 VOLUME ["/data"]
