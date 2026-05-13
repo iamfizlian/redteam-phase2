@@ -60,6 +60,8 @@ A     *.<test-domain>    <vm-public-ip>
 
 Use a fresh Debian 12 or Ubuntu 22.04+ VM with a public IP. Open only the ports needed for this test:
 
+For a concise Ubuntu-specific setup path, see `03-evilginx/docker/VM-QUICKSTART.md`.
+
 | Port | Protocol | Purpose |
 |---|---|---|
 | 22 | TCP | SSH administration |

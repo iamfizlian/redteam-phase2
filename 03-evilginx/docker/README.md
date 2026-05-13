@@ -4,6 +4,8 @@ This directory supports a disposable VM deployment for authorized AitM control v
 
 It intentionally does not include working Microsoft 365 phishlets, credential collection pages, stolen-token replay automation, or secrets.
 
+For the short Ubuntu VM deployment path, start with `VM-QUICKSTART.md`.
+
 ## VM Requirements
 
 - Debian 12 or Ubuntu 22.04+
