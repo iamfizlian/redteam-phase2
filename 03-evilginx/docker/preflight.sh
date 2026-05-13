@@ -45,12 +45,8 @@ if [ -f "$ENV_FILE" ]; then
   [ -n "${EVILGINX_VM_IP:-}" ] && ok "EVILGINX_VM_IP is set" || fail "EVILGINX_VM_IP is empty"
 fi
 
-mkdir -p "$SCRIPT_DIR/runtime/phishlets" "$SCRIPT_DIR/runtime/logs" "$SCRIPT_DIR/runtime/config"
+mkdir -p "$SCRIPT_DIR/runtime/logs" "$SCRIPT_DIR/runtime/config"
 ok "runtime directories exist"
-
-if [ -d "$SCRIPT_DIR/runtime/phishlets" ] && ! find "$SCRIPT_DIR/runtime/phishlets" -maxdepth 1 -type f | grep -q .; then
-  warn "runtime/phishlets is empty; this repo intentionally does not provide phishlets"
-fi
 
 for port in 80 443 53; do
   if command -v ss >/dev/null 2>&1 && ss -ltnu | awk '{print $5}' | grep -Eq "[:.]${port}$"; then

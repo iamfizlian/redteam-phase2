@@ -1,16 +1,18 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-mkdir -p /data/phishlets /data/logs /data/config
+mkdir -p /data/logs /data/config
 
 cat <<'EOF'
 Evilginx lab container
 
-Authorized validation only. This image does not include phishlets,
-credential collection pages, token replay automation, or tenant secrets.
+Authorized validation only. This image uses the phishlets included in
+the upstream Evilginx clone. This repository does not add custom
+phishlets, credential collection pages, token replay automation, or
+tenant secrets.
 
 Runtime paths:
-  /data/phishlets  mounted phishlets, read-only from host
+  /opt/evilginx2/phishlets  upstream Evilginx phishlets from the clone
   /data/logs       operator logs
   /root/.evilginx  persisted Evilginx config, mounted from runtime/config
 
@@ -30,4 +32,4 @@ if [ -n "${EVILGINX_VM_IP:-}" ]; then
 fi
 
 printf '\nStarting Evilginx console...\n\n'
-exec /usr/local/bin/evilginx -p /data/phishlets "$@"
+exec /usr/local/bin/evilginx -p /opt/evilginx2/phishlets "$@"

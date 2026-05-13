@@ -2,7 +2,9 @@
 
 This directory supports a disposable VM deployment for authorized AitM control validation. It builds upstream Evilginx and runs it with host networking so ports `80`, `443`, and `53` can bind on the VM.
 
-It intentionally does not include working Microsoft 365 phishlets, credential collection pages, stolen-token replay automation, or secrets.
+The container loads phishlets directly from the upstream Evilginx clone at `/opt/evilginx2/phishlets`.
+
+This repository does not add custom Microsoft 365 phishlets, credential collection pages, stolen-token replay automation, or secrets.
 
 For the short Ubuntu VM deployment path, start with `VM-QUICKSTART.md`.
 
@@ -35,7 +37,6 @@ EVILGINX_VM_IP=<vm-public-ip>
 Create runtime directories:
 
 ```bash
-mkdir -p 03-evilginx/docker/runtime/phishlets
 mkdir -p 03-evilginx/docker/runtime/logs
 mkdir -p 03-evilginx/docker/runtime/config
 ```

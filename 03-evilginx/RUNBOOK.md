@@ -90,12 +90,11 @@ EVILGINX_VM_IP=<vm-public-ip>
 Create runtime directories:
 
 ```bash
-mkdir -p 03-evilginx/docker/runtime/phishlets
 mkdir -p 03-evilginx/docker/runtime/logs
 mkdir -p 03-evilginx/docker/runtime/config
 ```
 
-Place only authorized lab phishlets in `03-evilginx/docker/runtime/phishlets/`. This repository intentionally does not provide them.
+The container loads phishlets directly from the upstream Evilginx clone at `/opt/evilginx2/phishlets`.
 
 Start the container:
 
