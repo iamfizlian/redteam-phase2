@@ -12,7 +12,7 @@ credential collection pages, token replay automation, or tenant secrets.
 Runtime paths:
   /data/phishlets  mounted phishlets, read-only from host
   /data/logs       operator logs
-  /data/config     lab notes/config artifacts
+  /root/.evilginx  persisted Evilginx config, mounted from runtime/config
 
 Attach with:
   docker attach evilginx-lab

@@ -14,6 +14,8 @@ For the short Ubuntu VM deployment path, start with `VM-QUICKSTART.md`.
 - DNS `A` record and wildcard `A` record pointing to the VM
 - Inbound `22/tcp`, `80/tcp`, `443/tcp`, and, if needed, `53/tcp` and `53/udp`
 
+If DNS is hosted by your registrar or cloud DNS provider, you do not need inbound `53/tcp` or `53/udp`. A local Ubuntu `systemd-resolved` listener on `127.0.0.53:53` is normal.
+
 ## Start
 
 ```bash

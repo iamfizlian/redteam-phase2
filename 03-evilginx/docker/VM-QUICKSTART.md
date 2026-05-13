@@ -20,6 +20,8 @@ Use the `deploy/evilginx-container` branch for the Ubuntu VM deployment.
 - DNS `A` record for the test domain pointing to the VM IP
 - DNS wildcard `A` record for `*.domain` pointing to the VM IP
 
+If DNS is hosted by your registrar or cloud DNS provider, skip inbound `53/tcp` and `53/udp`. Ubuntu's local `systemd-resolved` listener on `127.0.0.53:53` is normal and can be ignored.
+
 ## Packages
 
 ```bash

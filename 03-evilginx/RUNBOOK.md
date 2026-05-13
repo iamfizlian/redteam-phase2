@@ -69,6 +69,8 @@ For a concise Ubuntu-specific setup path, see `03-evilginx/docker/VM-QUICKSTART.
 | 443 | TCP | HTTPS |
 | 53 | TCP/UDP | DNS if using Evilginx DNS handling |
 
+If DNS is hosted by your registrar or cloud DNS provider, do not open `53/tcp` or `53/udp`. Ubuntu's local `systemd-resolved` listener on `127.0.0.53:53` is normal.
+
 Clone the container branch:
 
 ```bash

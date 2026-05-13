@@ -14,6 +14,6 @@ services:
       - ./runtime:/data
       - ./runtime/phishlets:/data/phishlets:ro
       - ./runtime/logs:/data/logs
-      - ./runtime/config:/data/config
+      - ./runtime/config:/root/.evilginx
     security_opt:
       - no-new-privileges:true
