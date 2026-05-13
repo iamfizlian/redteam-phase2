@@ -45,7 +45,7 @@ if [ -f "$ENV_FILE" ]; then
   [ -n "${EVILGINX_VM_IP:-}" ] && ok "EVILGINX_VM_IP is set" || fail "EVILGINX_VM_IP is empty"
 fi
 
-mkdir -p "$SCRIPT_DIR/runtime/logs" "$SCRIPT_DIR/runtime/config"
+mkdir -p "$SCRIPT_DIR/runtime/phishlets" "$SCRIPT_DIR/runtime/logs" "$SCRIPT_DIR/runtime/config"
 ok "runtime directories exist"
 
 for port in 80 443 53; do

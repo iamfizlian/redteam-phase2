@@ -12,6 +12,7 @@ services:
       - ../../.env
     volumes:
       - ./runtime:/data
+      - ./runtime/phishlets:/opt/evilginx2/phishlets
       - ./runtime/logs:/data/logs
       - ./runtime/config:/root/.evilginx
     security_opt:

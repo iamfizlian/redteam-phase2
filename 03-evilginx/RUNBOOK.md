@@ -92,9 +92,10 @@ Create runtime directories:
 ```bash
 mkdir -p 03-evilginx/docker/runtime/logs
 mkdir -p 03-evilginx/docker/runtime/config
+mkdir -p 03-evilginx/docker/runtime/phishlets
 ```
 
-The container loads phishlets directly from the upstream Evilginx clone at `/opt/evilginx2/phishlets`.
+The container loads phishlets from `/opt/evilginx2/phishlets`, which is mounted from `03-evilginx/docker/runtime/phishlets/` on the VM. If that host directory is empty on first start, it is initialized from the upstream Evilginx clone.
 
 Start the container:
 

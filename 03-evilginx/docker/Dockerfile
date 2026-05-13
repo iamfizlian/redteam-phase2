@@ -35,6 +35,7 @@ COPY entrypoint.sh /entrypoint.sh
 
 RUN chmod +x /entrypoint.sh \
     && chmod +x /usr/local/bin/evilginx \
+    && cp -a /opt/evilginx2/phishlets /opt/evilginx2/default-phishlets \
     && mkdir -p /data/phishlets /data/logs /data/config
 
 VOLUME ["/data"]

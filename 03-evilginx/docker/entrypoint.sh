@@ -1,7 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-mkdir -p /data/logs /data/config
+mkdir -p /data/logs /data/config /opt/evilginx2/phishlets
+
+if ! find /opt/evilginx2/phishlets -maxdepth 1 -type f \( -name '*.yaml' -o -name '*.yml' \) | grep -q .; then
+  if [ -d /opt/evilginx2/default-phishlets ]; then
+    printf 'Initializing persistent phishlets from upstream Evilginx clone...\n'
+    find /opt/evilginx2/default-phishlets -maxdepth 1 -type f \( -name '*.yaml' -o -name '*.yml' \) -exec cp {} /opt/evilginx2/phishlets/ \;
+  fi
+fi
 
 cat <<'EOF'
 Evilginx lab container
@@ -12,7 +19,7 @@ phishlets, credential collection pages, token replay automation, or
 tenant secrets.
 
 Runtime paths:
-  /opt/evilginx2/phishlets  upstream Evilginx phishlets from the clone
+  /opt/evilginx2/phishlets  persisted phishlets, mounted from runtime/phishlets
   /data/logs       operator logs
   /root/.evilginx  persisted Evilginx config, mounted from runtime/config
 
